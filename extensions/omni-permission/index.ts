@@ -1,3 +1,5 @@
+import * as fs from "node:fs/promises";
+import * as path from "node:path";
 import * as readline from "node:readline/promises";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
 import { emptyPluginConfigSchema } from "openclaw/plugin-sdk";
@@ -8,7 +10,17 @@ const omniPermissionPlugin = {
   configSchema: emptyPluginConfigSchema(),
 
   register(api: OpenClawPluginApi) {
-    api.logger.info("[omni-permission] 🛰️ Plugin Loaded.");
+    const keyPath = path.join(api.runtime.state.resolveStateDir(), "omni_key.txt");
+    api.logger.info(`[omni-permission] 🛰️ Plugin Loaded. Storage: ${keyPath}`);
+
+    // Helper to read the key for logging in hooks
+    const getSavedKey = async () => {
+      try {
+        return await fs.readFile(keyPath, "utf-8");
+      } catch {
+        return "NO_KEY_SAVED";
+      }
+    };
 
     // --- CLI COMMAND ---
     api.registerCli(
@@ -25,10 +37,12 @@ const omniPermissionPlugin = {
             rl.close();
 
             if (publicKey) {
-              api.logger.info(
-                `[omni-permission] 🔑 Key received: ${publicKey.substring(0, 10)}...`,
-              );
-              console.log(`✅ Registered key.`);
+              // Persist to disk so the Gateway process can see it
+              await fs.mkdir(path.dirname(keyPath), { recursive: true });
+              await fs.writeFile(keyPath, publicKey, "utf-8");
+
+              api.logger.info(`[omni-permission] 🔑 Key saved to disk.`);
+              console.log(`✅ Registered and Persisted: ${publicKey.substring(0, 10)}...`);
             }
           });
       },
@@ -36,45 +50,36 @@ const omniPermissionPlugin = {
     );
 
     // --- LIFECYCLE HOOKS ---
-    // Using names from your provided PluginHookName list
+    // All hooks now fetch and print the saved key
 
-    // 1. Gateway Startup
-    api.on("gateway_start", async (event) => {
-      api.logger.info(`[omni-permission] 🚀 Gateway started on port ${event.port}`);
+    api.on("gateway_start", async () => {
+      const key = await getSavedKey();
+      api.logger.info(`[omni-permission] 🚀 [Key: ${key}] Gateway starting.`);
     });
 
-    // 2. Incoming Message (When you type)
-    api.on("message_received", async (event, ctx) => {
-      api.logger.info(
-        `[omni-permission] 📥 Message from ${event.from} on ${ctx.channelId}: ${event.content}`,
-      );
+    api.on("message_received", async (event) => {
+      const key = await getSavedKey();
+      api.logger.info(`[omni-permission] 📥 [Key: ${key}] Message: ${event.content}`);
     });
 
-    // 3. Before AI Tool Execution (The "Gatekeeper" for Slack/Shell)
-    api.on("before_tool_call", async (event, ctx) => {
-      api.logger.info(`[omni-permission] 🛡️ Agent requesting tool: ${event.toolName}`);
-
-      // This is where you will implement your Human-in-the-Loop check later
-      if (event.toolName.includes("slack")) {
-        api.logger.warn(`[omni-permission] 🛑 Intercepting Slack call...`);
-      }
+    api.on("before_tool_call", async (event) => {
+      const key = await getSavedKey();
+      api.logger.info(`[omni-permission] 🛡️ [Key: ${key}] Tool Call: ${event.toolName}`);
     });
 
-    // 4. After AI Tool Execution
     api.on("after_tool_call", async (event) => {
-      api.logger.info(
-        `[omni-permission] ✅ Tool ${event.toolName} finished in ${event.durationMs}ms`,
-      );
+      const key = await getSavedKey();
+      api.logger.info(`[omni-permission] ✅ [Key: ${key}] Tool Result: ${event.toolName}`);
     });
 
-    // 5. Outgoing Message (When the bot replies)
-    api.on("message_sending", async (event) => {
-      api.logger.info(`[omni-permission] 📤 Sending reply to ${event.to}`);
+    api.on("message_sending", async () => {
+      const key = await getSavedKey();
+      api.logger.info(`[omni-permission] 📤 [Key: ${key}] Bot is replying.`);
     });
 
-    // 6. Agent Session End
-    api.on("agent_end", async (event) => {
-      api.logger.info(`[omni-permission] 🏁 Agent run complete. Success: ${event.success}`);
+    api.on("agent_end", async () => {
+      const key = await getSavedKey();
+      api.logger.info(`[omni-permission] 🏁 [Key: ${key}] Session ended.`);
     });
   },
 };
