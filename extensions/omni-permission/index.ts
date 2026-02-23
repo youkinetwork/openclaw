@@ -3,38 +3,56 @@ import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
 const omniPermissionPlugin = {
   id: "omni-permission",
   name: "Omni-Permission Monitor",
-  configSchema: null,
+  configSchema: {
+    type: "object",
+    properties: {},
+  },
 
   register(api: OpenClawPluginApi) {
-    api.logger.info("🛰️ Omni-Permission Monitor: Active.");
+    // Initial load log
+    api.logger.info("[omni-permission] 🛰️ Monitor: Active.");
 
-    // Register for the broad "message" type
-    api.registerHook("message", async (event: any) => {
-      // Manual Guard for "received" (Matches your source file logic)
-      if (event.action === "received" && event.context) {
-        const { from, content, channelId } = event.context;
-        api.logger.info(`[RECV] [${channelId}] ${from}: ${content}`);
-      }
+    // Hook 1: Message monitoring
+    api.registerHook(
+      "message",
+      async (event: any) => {
+        if (event.action === "received" && event.context) {
+          const { from, content, channelId } = event.context;
+          api.logger.info(`[omni-permission] [RECV] [${channelId}] ${from}: ${content}`);
+        }
 
-      // Manual Guard for "sent" (Matches your source file logic)
-      if (event.action === "sent" && event.context) {
-        const { to, content, channelId, success } = event.context;
-        const status = success ? "SENT" : "FAILED";
-        api.logger.info(`[${status}] [${channelId}] To: ${to} | Content: ${content}`);
-      }
-    });
+        if (event.action === "sent" && event.context) {
+          const { to, content, channelId, success } = event.context;
+          const status = success ? "SENT" : "FAILED";
+          api.logger.info(
+            `[omni-permission] [${status}] [${channelId}] To: ${to} | Content: ${content}`,
+          );
+        }
+      },
+      { name: "omni-permission-message-handler" },
+    );
 
-    // Register for the "gateway" type
-    api.registerHook("gateway", async (event: any) => {
-      if (event.action === "startup") {
-        api.logger.info("🚀 Gateway startup hook triggered.");
-      }
-    });
+    // Hook 2: Gateway lifecycle monitoring
+    api.registerHook(
+      "gateway",
+      async (event: any) => {
+        if (event.action === "startup") {
+          api.logger.info("[omni-permission] 🚀 Gateway startup hook triggered.");
+        }
+      },
+      { name: "omni-permission-gateway-handler" },
+    );
 
-    // Generic listener for everything else
-    api.registerHook("agent", async (event: any) => {
-      api.logger.info(`[AGENT] Action: ${event.action} | ID: ${event.context?.agentId || "N/A"}`);
-    });
+    // Hook 3: Agent reasoning monitoring
+    api.registerHook(
+      "agent",
+      async (event: any) => {
+        api.logger.info(
+          `[omni-permission] [AGENT] Action: ${event.action} | ID: ${event.context?.agentId || "N/A"}`,
+        );
+      },
+      { name: "omni-permission-agent-handler" },
+    );
   },
 };
 
