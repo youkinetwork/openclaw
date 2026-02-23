@@ -17,3 +17,15 @@ pnpm dev --dev plugins list
 
 # Install the plugin
 pnpm dev --dev plugins install --link ./extensions/omni-permission
+
+# Run the web dashboard
+pnpm dev --dev dashboard
+
+# Add Slack
+pnpm dev --dev channels add 
+
+# Enable a plugin
+pnpm dev --dev plugins enable @openclaw/slack
+
+# Necessary for enabling hooks
+pnpm dev --dev config set plugins.allow "[\"omni-permission\"]"

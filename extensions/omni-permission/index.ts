@@ -1,58 +1,81 @@
+import * as readline from "node:readline/promises";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
+import { emptyPluginConfigSchema } from "openclaw/plugin-sdk";
 
 const omniPermissionPlugin = {
   id: "omni-permission",
   name: "Omni-Permission Monitor",
-  configSchema: {
-    type: "object",
-    properties: {},
-  },
+  configSchema: emptyPluginConfigSchema(),
 
   register(api: OpenClawPluginApi) {
-    // Initial load log
-    api.logger.info("[omni-permission] 🛰️ Monitor: Active.");
+    api.logger.info("[omni-permission] 🛰️ Plugin Loaded.");
 
-    // Hook 1: Message monitoring
-    api.registerHook(
-      "message",
-      async (event: any) => {
-        if (event.action === "received" && event.context) {
-          const { from, content, channelId } = event.context;
-          api.logger.info(`[omni-permission] [RECV] [${channelId}] ${from}: ${content}`);
-        }
+    // --- CLI COMMAND ---
+    api.registerCli(
+      ({ program }) => {
+        program
+          .command("omni-permission")
+          .command("set-key")
+          .action(async () => {
+            const rl = readline.createInterface({
+              input: process.stdin,
+              output: process.stdout,
+            });
+            const publicKey = await rl.question("Please enter your OpenClaw Public Key: ");
+            rl.close();
 
-        if (event.action === "sent" && event.context) {
-          const { to, content, channelId, success } = event.context;
-          const status = success ? "SENT" : "FAILED";
-          api.logger.info(
-            `[omni-permission] [${status}] [${channelId}] To: ${to} | Content: ${content}`,
-          );
-        }
+            if (publicKey) {
+              api.logger.info(
+                `[omni-permission] 🔑 Key received: ${publicKey.substring(0, 10)}...`,
+              );
+              console.log(`✅ Registered key.`);
+            }
+          });
       },
-      { name: "omni-permission-message-handler" },
+      { commands: ["omni-permission"] },
     );
 
-    // Hook 2: Gateway lifecycle monitoring
-    api.registerHook(
-      "gateway",
-      async (event: any) => {
-        if (event.action === "startup") {
-          api.logger.info("[omni-permission] 🚀 Gateway startup hook triggered.");
-        }
-      },
-      { name: "omni-permission-gateway-handler" },
-    );
+    // --- LIFECYCLE HOOKS ---
+    // Using names from your provided PluginHookName list
 
-    // Hook 3: Agent reasoning monitoring
-    api.registerHook(
-      "agent",
-      async (event: any) => {
-        api.logger.info(
-          `[omni-permission] [AGENT] Action: ${event.action} | ID: ${event.context?.agentId || "N/A"}`,
-        );
-      },
-      { name: "omni-permission-agent-handler" },
-    );
+    // 1. Gateway Startup
+    api.on("gateway_start", async (event) => {
+      api.logger.info(`[omni-permission] 🚀 Gateway started on port ${event.port}`);
+    });
+
+    // 2. Incoming Message (When you type)
+    api.on("message_received", async (event, ctx) => {
+      api.logger.info(
+        `[omni-permission] 📥 Message from ${event.from} on ${ctx.channelId}: ${event.content}`,
+      );
+    });
+
+    // 3. Before AI Tool Execution (The "Gatekeeper" for Slack/Shell)
+    api.on("before_tool_call", async (event, ctx) => {
+      api.logger.info(`[omni-permission] 🛡️ Agent requesting tool: ${event.toolName}`);
+
+      // This is where you will implement your Human-in-the-Loop check later
+      if (event.toolName.includes("slack")) {
+        api.logger.warn(`[omni-permission] 🛑 Intercepting Slack call...`);
+      }
+    });
+
+    // 4. After AI Tool Execution
+    api.on("after_tool_call", async (event) => {
+      api.logger.info(
+        `[omni-permission] ✅ Tool ${event.toolName} finished in ${event.durationMs}ms`,
+      );
+    });
+
+    // 5. Outgoing Message (When the bot replies)
+    api.on("message_sending", async (event) => {
+      api.logger.info(`[omni-permission] 📤 Sending reply to ${event.to}`);
+    });
+
+    // 6. Agent Session End
+    api.on("agent_end", async (event) => {
+      api.logger.info(`[omni-permission] 🏁 Agent run complete. Success: ${event.success}`);
+    });
   },
 };
 
