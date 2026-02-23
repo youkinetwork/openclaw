@@ -1,0 +1,14 @@
+{
+  "name": "omni-permission",
+  "version": "1.0.0",
+  "description": "Gateway activity monitor extension",
+  "type": "module",
+  "devDependencies": {
+    "openclaw": "workspace:*"
+  },
+  "openclaw": {
+    "extensions": [
+      "./index.ts"
+    ]
+  }
+}

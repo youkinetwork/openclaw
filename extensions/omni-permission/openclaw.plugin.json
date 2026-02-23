@@ -1,0 +1,12 @@
+{
+  "id": "omni-permission",
+  "name": "Omni-Permission Monitor",
+  "version": "1.0.0",
+  "description": "Prints all gateway activities (messages, tools, and system events) to the console.",
+  "author": "Your Name",
+  "entry": "./index.ts",
+  "capabilities": ["hooks"],
+  "permissions": {
+    "system": ["read-activity"]
+  }
+}
